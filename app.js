@@ -138,7 +138,7 @@ function rEdit(){
   <div class="line" style="margin-top:8px"><input type="text" readonly value="${esc(urlFor('parent'))}" aria-label="부모용 링크" class="ro"><button class="btn" data-act="copy" data-u="parent">부모용 링크 복사</button></div>
   <div class="line" style="margin-top:8px"><input type="text" readonly value="${esc(FID)}" aria-label="가족 코드" class="ro"><button class="btn" data-act="copy" data-u="code">가족 코드 복사</button></div>
   <p class="note">부모용 링크는 다른 보호자 기기용 (편집 가능). 링크와 코드가 곧 열쇠라서 가족 밖에는 보내지 않기</p></div>
-  <h2>관리</h2><div class="row-btns"><button class="btn" data-act="ask" data-what="week">이번 주 체크 지우기</button><button class="btn warn" data-act="ask" data-what="clear">모두 비우기</button><button class="btn" data-act="ask" data-what="leave">이 기기 연결 끊기</button></div>`;
+  <h2>관리</h2><div class="row-btns"><button class="btn" data-act="ask" data-what="week">이번 주 체크 지우기</button><button class="btn" data-act="imp">옮겨 오기</button><button class="btn warn" data-act="ask" data-what="clear">모두 비우기</button><button class="btn" data-act="ask" data-what="leave">이 기기 연결 끊기</button></div>`;
 }
 function rMonth(){
   const now=new Date();now.setHours(0,0,0,0);
@@ -208,6 +208,15 @@ document.addEventListener('click',e=>{
   if(a==='applyall'){const o=find('ev',id);if(!o)return;for(const m of [o.slots,o.dates])for(const k in m)m[k]={start:o.start,end:o.end};save();render();toast('모든 시간을 기본 시간으로 바꿈');return}
   if(a==='adddate'){const o=find('ev',id),v=document.getElementById('nd-'+id)?.value;if(!o)return;if(!v){toast('날짜를 먼저 선택');return}o.dates[v]=o.dates[v]||{start:o.start,end:o.end};save();render();return}
   if(a==='deldate'){const o=find('ev',id),k=b.dataset.k;if(!o||!o.dates[k])return;const old=o.dates[k];delete o.dates[k];save();render();toast(fmtD(k)+' 삭제됨',()=>{o.dates[k]=old;save();render()});return}
+  if(a==='imp'){$('pop').innerHTML=`<div class="modal"><div><p style="margin-top:0;font-weight:700">Claude 계획표의 새 앱으로 옮기기에서 복사한 내용을 붙여 넣기 (지금 입력된 할 일과 일정은 바뀜)</p><textarea id="impt" style="width:100%;height:140px;font-size:16px;border:2px solid var(--line);border-radius:10px;padding:8px;background:var(--paper);color:var(--ink)"></textarea><p class="row-btns" style="margin:10px 0 0"><button class="btn pri" data-act="impok">가져오기</button><button class="btn" data-act="no">취소</button></p></div></div>`;$('impt').focus();return}
+  if(a==='impok'){let d=null;try{d=JSON.parse($('impt').value.trim())}catch(e){}
+    if(!d||!Array.isArray(d.tasks)||!Array.isArray(d.events)){toast('내용이 올바르지 않음. 처음부터 끝까지 다시 복사');return}
+    S.tasks=d.tasks.filter(t=>t&&typeof t.id==='string').map(t=>({id:t.id,name:String(t.name||''),cat:CATS[t.cat]?t.cat:'etc',days:(t.days||[]).filter(n=>n>=0&&n<7)}));
+    S.events=d.events.filter(e=>e&&typeof e.id==='string').map(e=>({id:e.id,name:String(e.name||''),mode:e.mode==='dates'?'dates':'weekly',start:String(e.start||'15:00'),end:String(e.end||'16:00'),slots:e.slots||{},dates:e.dates||{},days:e.days}));
+    for(const e of S.events)if(e.days===undefined)delete e.days;mig();
+    const c=d.checks&&typeof d.checks==='object'?d.checks:{};for(const k in c){if(!/^\d{4}-\d\d-\d\d$/.test(k)||typeof c[k]!=='object')continue;S.checks[k]=S.checks[k]||{};for(const id in c[k])if(c[k][id]===true)S.checks[k][id]=true}
+    cache();if(ref)F.updateDoc(ref,{tasks:S.tasks,events:S.events,checks:S.checks}).catch(()=>syncTxt('저장 실패, 연결 확인 필요'));
+    $('pop').innerHTML='';render();toast(`할 일 ${S.tasks.length}개, 일정 ${S.events.length}개 옮겨 옴`);return}
   if(a==='undo'){if(undo)undo();$('pop').innerHTML='';undo=null;return}
   if(a==='ask'){const w=b.dataset.what;$('pop').innerHTML=`<div class="modal"><div><p style="margin-top:0;font-weight:700">${esc(ASK[w][0])}</p><div class="row-btns" style="margin:0"><button class="btn pri" data-act="yes" data-what="${w}">확인</button><button class="btn" data-act="no">취소</button></div></div></div>`;return}
   if(a==='yes'){ASK[b.dataset.what][1]();$('pop').innerHTML='';render();return}
